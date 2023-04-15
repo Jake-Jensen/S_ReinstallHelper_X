@@ -7,6 +7,14 @@ use std::io::Read;
 use std::net::TcpStream;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::process::exit;
+use reqwest::blocking::Client;
+use reqwest::Error;
+use reqwest::blocking::Response;
+use std::io::{BufRead, BufReader};
+
+
+pub const RepoURL: &str = "https://sapphirelabs.online/SRH/";
+pub const RepoDomain: &str = "SapphireLabs.Online";
 
 fn _Log(Message: &str) {
     println!("[Debug] {}", Message);
@@ -14,7 +22,7 @@ fn _Log(Message: &str) {
 
 fn GetIP_MainServer() -> IpAddr {
     let mut ReturnIP = IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255));
-    let hostname = "sapphirelabs.online";
+    let hostname = RepoDomain;
     match hostname.parse::<IpAddr>() {
         Ok(ip) => println!("IP address is {}", ip),
         Err(_) => {
@@ -41,25 +49,36 @@ fn GetIP_MainServer() -> IpAddr {
 
 }
 
-fn Download_url(url: &str) -> Result<String, reqwest::Error> {
-    // Send a GET request to the URL
-    let mut response = reqwest::blocking::get(url)?;
-
-    // Read the response body into a string
-    let mut content = String::new();
-    response
-        .read_to_string(&mut content)
-        .expect("Failed to read response");
-
-    Ok(content)
+fn ResponseToVec(response: Result<reqwest::Response) -> Vec<String> {
+    let reader = BufReader::new(response.bytes().unwrap().as_ref());
+    reader.lines().map(Result::unwrap).collect()
 }
 
-fn DoDownload(URL: &str) {
+fn Download_url(url: &str, Username: &str, Password: &str) -> Vec<String> {
+    let client = Client::new();
+
+    let user_name = "testuser".to_string();
+    let password: Option<String> = None;
+
+    let response = client
+        .get("https://httpbin.org/")
+        .basic_auth(user_name, password)
+        .send();
+
+    println!("{:?}", response);
+
+    return ResponseToVec(response);
+}
+
+fn DoDownload(URL: &str) -> String {
+    let mut ReturnContent: String = "".to_string();
     let url = URL;
     match Download_url(url) {
-        Ok(content) => println!("Downloaded {} bytes from {}", content.len(), url),
+        Ok(content) => { println!("Downloaded {} bytes from {}", content.len(), url); 
+        ReturnContent = content;},
         Err(e) => println!("Failed to download {}: {:?}", url, e),
     }
+    return ReturnContent;
 }
 
 fn TestForMainServerConnection() -> bool {
@@ -103,4 +122,7 @@ fn main() {
             println!("Successfully got the main server IP and confirmed the connection.");
         }
     }
+
+    let PageContent = DoDownload(RepoURL);
+    println!("{}", PageContent);
 }
